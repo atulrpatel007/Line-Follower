@@ -1,0 +1,105 @@
+// ================= MOTOR PINS =================
+#define ENA 9
+#define IN1 8
+#define IN2 7
+
+#define ENB 10
+#define IN3 6
+#define IN4 5
+
+// ================= IR SENSORS =================
+#define IR1 A0
+#define IR2 A1
+#define IR3 A2
+#define IR4 A3
+#define IR5 A4
+
+// ================= SPEED SETTINGS =================
+int baseSpeed = 130;
+int maxSpeed  = 200;
+int turnSpeed = 90;
+
+// PID-like constants (tune these)
+float Kp = 25.0;    // Proportional gain
+
+int lastError = 0;
+
+// ================= SETUP =================
+void setup() {
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(ENB, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+  pinMode(IR3, INPUT);
+  pinMode(IR4, INPUT);
+  pinMode(IR5, INPUT);
+
+  Serial.begin(9600);
+}
+
+// ================= MAIN LOOP =================
+void loop() {
+  int s1 = digitalRead(IR1);
+  int s2 = digitalRead(IR2);
+  int s3 = digitalRead(IR3);
+  int s4 = digitalRead(IR4);
+  int s5 = digitalRead(IR5);
+
+  int error = calculateError(s1, s2, s3, s4, s5);
+  int correction = Kp * error;
+
+  int leftSpeed  = baseSpeed - correction;
+  int rightSpeed = baseSpeed + correction;
+
+  leftSpeed  = constrain(leftSpeed, 0, maxSpeed);
+  rightSpeed = constrain(rightSpeed, 0, maxSpeed);
+
+  moveForward(leftSpeed, rightSpeed);
+}
+
+// ================= ERROR CALCULATION =================
+int calculateError(int s1, int s2, int s3, int s4, int s5) {
+
+  // Perfect center
+  if (s1 && s2 && !s3 && s4 && s5) return 0;
+
+  // Slight left
+  if (s1 && !s2 && !s3 && s4 && s5) return -1;
+  if (!s1 && !s2 && s3 && s4 && s5) return -2;
+
+  // Hard left
+  if (!s1 && s2 && s3 && s4 && s5) return -3;
+  if (!s1 && !s2 && !s3 && s4 && s5) return -4;
+
+  // Slight right
+  if (s1 && s2 && !s3 && !s4 && s5) return 1;
+  if (s1 && s2 && s3 && !s4 && !s5) return 2;
+
+  // Hard right
+  if (s1 && s2 && s3 && s4 && !s5) return 3;
+  if (s1 && s2 && !s3 && !s4 && !s5) return 4;
+
+  // Line lost → recover using last direction
+  if (s1 && s2 && s3 && s4 && s5) return lastError;
+
+  lastError = error;
+  return error;
+}
+
+// ================= MOTOR CONTROL =================
+void moveForward(int leftSpeed, int rightSpeed) {
+  analogWrite(ENA, leftSpeed);
+  analogWrite(ENB, rightSpeed);
+
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
